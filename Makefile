@@ -1,4 +1,4 @@
-PROJECT:= name
+PROJECT:= pydcm2niix
 
 .PHONY: check test codestyle docstyle lint
 
