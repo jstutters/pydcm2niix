@@ -1,13 +1,13 @@
+import codecs
 import os.path
 from setuptools import find_packages, setup
 
-NAME = ''
+NAME = 'pydcm2niix'
 version = open(os.path.join(NAME, 'VERSION')).read().strip()
 
 
-def readme():
-    with open('README.rst') as f:
-        return f.read()
+with codecs.open('README.rst', encoding='utf-8') as f:
+    long_description = f.read()
 
 
 setup(
@@ -17,9 +17,9 @@ setup(
     include_package_data=True,
     zip_safe=True,
     author='Jon Stutters',
-    author_email='',
+    author_email='j.stutters@ucl.ac.uk',
     description='',
-    long_description=readme(),
+    long_description=long_description,
     url='',
     install_requires=[],
     setup_requires=['pytest-runner'],
