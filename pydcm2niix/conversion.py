@@ -5,14 +5,16 @@ import tempfile
 import dicom
 
 
-def is_mt_on_philips(dicom_header):
+def _is_mt_on_philips(dicom_header):
+    """Check whether a Philips header indicates that the sequence is MT/on."""
     if 'philips' not in dicom_header.Manufacturer.lower():
         raise ValueError('Not a Philips header')
     private_mt_value = dicom_header.get([0x2005, 0x10a0]).value
     return private_mt_value > 0.0
 
 
-def is_mt_on_toshiba(dicom_header, min_sar, max_sar):
+def _is_mt_on_toshiba(dicom_header, min_sar, max_sar):
+    """Check whether a Toshiba header indicates that the sequence is MT/on."""
     if 'toshiba' not in dicom_header.Manufacturer.lower():
         raise ValueError('Not a Toshiba header')
     sar_value = str(dicom_header.get((0x0018, 0x1316)).value)
@@ -24,42 +26,46 @@ def is_mt_on_toshiba(dicom_header, min_sar, max_sar):
     return sar_value == max_sar
 
 
-def is_mt_on_siemens(dicom_header):
+def _is_mt_on_siemens(dicom_header):
+    """Check whether a Siemens header indicates that the sequence is MT/on."""
     if 'siemens' not in dicom_header.Manufacturer.lower():
         raise ValueError('Not a Siemens header')
     scan_options = dicom_header.get('ScanOptions')
     return 'MT' in scan_options
 
 
-def is_mt_on_hitachi(dicom_header):
+def _is_mt_on_hitachi(dicom_header):
+    """Check whether a Hitachi header indicates that the sequence is MT/on."""
     if 'hitachi' not in dicom_header.Manufacturer.lower():
         raise ValueError('Not a Hitachi header')
     sequence_variant = dicom_header.get('SequenceVariant')
     return 'MTC' in sequence_variant
 
 
-def is_mt_on_ge(dicom_header):
+def _is_mt_on_ge(dicom_header):
+    """Check whether a GE header indicates that the sequence is MT/on."""
     if 'ge' not in dicom_header.Manufacturer.lower():
         raise ValueError('Not a GE header')
     scan_options = dicom_header.get('ScanOptions')
     return 'MT_GEMS' in scan_options
 
 
-def is_mt_on(dicom_header, min_sar=None, max_sar=None):
+def _is_mt_on(dicom_header, min_sar=None, max_sar=None):
     manuf = dicom_header.Manufacturer.lower()
     if 'ge' in manuf:
-        return is_mt_on_ge(dicom_header)
+        return _is_mt_on_ge(dicom_header)
     elif 'philips' in manuf:
-        return is_mt_on_philips(dicom_header)
+        return _is_mt_on_philips(dicom_header)
     elif 'hitachi' in manuf:
-        return is_mt_on_hitachi(dicom_header)
+        return _is_mt_on_hitachi(dicom_header)
     elif 'siemens' in manuf:
-        return is_mt_on_siemens(dicom_header)
+        return _is_mt_on_siemens(dicom_header)
     elif 'toshiba' in manuf:
-        return is_mt_on_toshiba(dicom_header, min_sar, max_sar)
+        return _is_mt_on_toshiba(dicom_header, min_sar, max_sar)
 
 
-def convert_with_dcm2niix(dicom_dir, nifti_filename):
+def _run_dcm2niix(dicom_dir, nifti_filename):
+    """Run dcm2niix on a directory of DICOM images."""
     if os.path.exists(nifti_filename):
         raise FileExistsError(nifti_filename)
     dirname = os.path.dirname(nifti_filename)
@@ -80,11 +86,13 @@ def convert_with_dcm2niix(dicom_dir, nifti_filename):
 
 
 def _sar_range(dicoms):
+    """Find the minimum and maximum SAR values in a list of DICOM headers."""
     sars = set([float(d.SAR) for d in dicoms])
     return str(min(sars)), str(max(sars))
 
 
-def dicom_to_nifti_mt(dicom_dir, output_dir, mton_name='mton.nii.gz', mtoff_name='mtoff.nii.gz'):
+def dicom_to_nifti_mt(dicom_dir, mton_name='mton.nii.gz', mtoff_name='mtoff.nii.gz'):
+    """Convert a directory of DICOM images containing both MT/on and MT/off to NIFTI_GZ."""
     dicoms = []
     for f in os.listdir(dicom_dir):
         filename = os.path.join(dicom_dir, f)
@@ -94,7 +102,7 @@ def dicom_to_nifti_mt(dicom_dir, output_dir, mton_name='mton.nii.gz', mtoff_name
     mtoff_dir = tempfile.mkdtemp(suffix='-mtoff')
     mt_found = [False, False]
     for filename, dicom_header in dicoms:
-        if is_mt_on(dicom_header, min_sar=min_sar, max_sar=max_sar):
+        if _is_mt_on(dicom_header, min_sar=min_sar, max_sar=max_sar):
             shutil.copy(filename, mton_dir)
             mt_found[0] = True
         else:
@@ -102,16 +110,13 @@ def dicom_to_nifti_mt(dicom_dir, output_dir, mton_name='mton.nii.gz', mtoff_name
             mt_found[1] = True
     if not all(mt_found):
         raise Exception('MT sequence detection failed ({0!r})'.format(dicom_dir))
-    for mt_name, mt_dir in ((mton_name, mton_dir), (mtoff_name, mtoff_dir)):
-        mt_filename = os.path.join(output_dir, mt_name)
-        if os.path.exists(mt_filename):
-            raise FileExistsError(mt_filename)
-        convert_with_dcm2niix(mt_dir, mt_filename)
+    for mt_filename, mt_dir in ((mton_name, mton_dir), (mtoff_name, mtoff_dir)):
+        _run_dcm2niix(mt_dir, mt_filename)
         shutil.rmtree(mt_dir)
 
 
-def dicom_to_nifti(dicom_dir, output_dir, sequence):
-    if sequence == 'mtr':
-        dicom_to_nifti_mt(dicom_dir, output_dir)
+def dicom_to_nifti(src, dest, is_mtr=False):
+    if is_mtr:
+        dicom_to_nifti_mt(src, mton_name=dest[0], mtoff_name=dest[1])
     else:
-        convert_with_dcm2niix(dicom_dir, os.path.join(output_dir, sequence + '.nii.gz'))
+        _run_dcm2niix(src, dest)
