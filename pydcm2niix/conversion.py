@@ -1,3 +1,5 @@
+"""Module for interacting with the dcm2niix DICOM converter."""
+
 import os
 import shutil
 import subprocess
@@ -116,6 +118,7 @@ def dicom_to_nifti_mt(dicom_dir, mton_name='mton.nii.gz', mtoff_name='mtoff.nii.
 
 
 def dicom_to_nifti(src, dest, is_mtr=False):
+    """Convert a directory of DICOM images to NIFTI format."""
     if is_mtr:
         dicom_to_nifti_mt(src, mton_name=dest[0], mtoff_name=dest[1])
     else:
