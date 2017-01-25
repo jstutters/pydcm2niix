@@ -80,7 +80,17 @@ def _run_dcm2niix(dicom_dir, nifti_filename):
         compress = 'n'
     if dirname == '':
         dirname = '.'
-    cmd = ['dcm2niix', '-z', compress, '-o', dirname, '-f', filename, dicom_dir]
+    cmd = [
+        'dcm2niix',
+        '-b', 'n',
+        '-m', 'n',
+        '-s', 'n',
+        '-t', 'n',
+        '-x', 'n',
+        '-z', compress,
+        '-o', dirname,
+        '-f', filename,
+        dicom_dir]
     dcm2niix_output = subprocess.check_output(cmd)
     if b'warning' in dcm2niix_output.lower():
         print(dcm2niix_output)
